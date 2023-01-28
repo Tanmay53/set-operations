@@ -23,58 +23,26 @@ function union(...paths) {
         }
     })
     
-    // Making a Copy of the Array
+    // Making a Blank Copy of the Array
     segmented_paths = paths.map( path => Array() )
     
-    var index = [0, 0]
+    var index = [0/*For Paths on left*/, 0/*For Path on right*/]
     
-    // Finding Intersections and isolating them
+    // Finding Intersections between all paths and isolating them in segmented_paths
     for(index[0] = 0; index[0] < paths.length - 1; index[0]++) {
         for(index[1] = (index[0] + 1); index[1] < paths.length; index[1]++) {
             intersect(paths[index[0]].path, paths[index[1]].path).map( intersection => {
                 // Assuming no relativity in the data
-    
+                // Lopping for the two paths in the intersection
                 for(path_no = 1; path_no <= 2; path_no++)
                 {
-                    P0 = getInitialPoint(intersection['segment' + path_no], paths[index[path_no - 1]])
-                    // P0 = P1 = P2 = [0, 0]
-                    // prev_segment = (intersection['segment' + path_no] > 0) ? paths[index[path_no - 1]].segments[intersection['segment' + path_no] - 1] : null
-                    // if( prev_segment ) {
-                    //     switch( prev_segment.type ) {
-                    //         case SVGPathData.MOVE_TO:
-                    //         case SVGPathData.LINE_TO:
-                    //         case SVGPathData.QUAD_TO:
-                    //             P0 = [prev_segment.x, prev_segment.y]
-                    //         break;
-                    //     }
-                    // }
+                    let path_index = index[path_no - 1]
+
+                    P0 = getInitialPoint(intersection['segment' + path_no], paths[path_index])
         
-                    curr_segment = paths[index[path_no - 1]].segments[intersection['segment' + path_no]]
+                    curr_segment = paths[path_index].segments[intersection['segment' + path_no]]
         
-                    new_segments = splitSegment(curr_segment, P0, intersection, paths[index[path_no - 1]], path_no)
-        
-                    // switch( curr_segment.type ) {
-                    //     case SVGPathData.LINE_TO:
-                    //         new_segments = new SVGPathData(`
-                    //                             L${intersection.x} ${intersection.y}
-                    //                             L${curr_segment.x} ${curr_segment.y}`).commands
-                    //     break;
-                    //     case SVGPathData.QUAD_TO:
-                    //         P1 = [curr_segment.x1, curr_segment.y1]
-                    //         P2 = [curr_segment.x, curr_segment.y]
-                    //         var [left, right] = splitQCurve([P0, P1, P2], intersection['t' + path_no])
-        
-                    //         segment_string = (left.length == 3) ? `Q${left[1][0]} ${left[1][1]} ${left[2][0]} ${left[2][1]}` : ""
-                    //         segment_string += (right.length == 3) ? `Q${right[1][0]} ${right[1][1]} ${right[2][0]} ${right[2][1]}` : ""
-        
-                    //         new_segments = new SVGPathData(segment_string).commands
-                    //     break;
-                    //     case SVGPathData.CLOSE_PATH:
-                    //         new_segments = new SVGPathData(`
-                    //                             L${intersection.x} ${intersection.y}
-                    //                             L${paths[index[path_no - 1]].segments[0].x} ${paths[index[path_no - 1]].segments[0].y}`).commands
-                    //     break;
-                    // }
+                    new_segments = splitSegment(curr_segment, P0, intersection, paths[path_index], path_no)
 
                     // Assuming there are 2 new segments
                     new_segments = new_segments.map( (segment, segment_index) => {
@@ -90,27 +58,25 @@ function union(...paths) {
                     } )
         
                     if( new_segments ) {
-                        // console.log( index[path_no - 1], segmented_paths[index[path_no - 1]])
-                        segmented_paths[index[path_no - 1]].push({
+                        segmented_paths[path_index].push({
                             segment_no: intersection['segment' + path_no],
-                            new_segments: new_segments,
-                            // Assuming that there are 2 new segments
-                            // intersectee: (path_no == 1) ? index[1] : index[0],
-                            // intersection_coord: {
-                            //     x: intersection.x,
-                            //     y: intersection.y
-                            // }
+                            new_segments: new_segments
                         })
-                        // segmented_paths[index[path_no - 1]].segments.splice(intersection['segment' + path_no], 1, ...new_segments)
                     }
                 }
-    
-                // return intersection
-                // Create Two segments at the intersection
             })
         }
     }
 
+
+    // We have some Segments which overlap each other due to multiple intersections on same original segment
+    // - is segment
+    // * is intersection
+    // ----*----- s1
+    // --*------- s2
+    // -------*-- s{n}
+    // Final Segments should look like following segments
+    // --*-*--*--
     segmented_paths = segmented_paths.map( (segmented_path, index) => {
         overlaping_segment_list = segmented_path.filter( segment => {
             return segmented_path.filter( segment_1 => segment.segment_no == segment_1.segment_no ).length > 1
@@ -118,15 +84,6 @@ function union(...paths) {
             prev[current.segment_no] = [...(prev[current.segment_no] ? prev[current.segment_no] : []), current.new_segments]
             return prev
         }, {})
-
-        // We have some Segments which overlap each other due to multiple intersections on same original segment
-        // - is segment
-        // * is intersection
-        // ----*----- s1
-        // --*------- s2
-        // -------*-- s{n}
-        // Final Segments should look like following segments
-        // --*-*--*--
 
         let new_segmented_path = Object.keys(overlaping_segment_list).map( segment_no => {
             overlaping_segments = overlaping_segment_list[segment_no]
@@ -157,9 +114,14 @@ function union(...paths) {
                         else
                         {
                             path_1 = getPathString(P0, sub_segments[0])
-                            // A line around the end point of smallest segment to intersect other segments
+
+                            // A line around the end point of the "smallest segment" to intersect other segments with
                             path_2 = `M${smallest_segment.x - 1} ${smallest_segment.y - 1}L${smallest_segment.x + 1} ${smallest_segment.y + 1}`
+
+                            // Need to create a fallback intersecting line to intersect the segment if paht_2 lies on path_1 and hence is not able to intersect
+
                             intersections = intersect(path_1, path_2)
+
                             if( intersections.lenght > 0 )
                             {
                                 [left, right] = splitSegment(sub_segments[0], P0, intersections[0], paths[index], 1)
@@ -177,6 +139,7 @@ function union(...paths) {
             return {
                 segment_no: segment_no,
                 new_segments: new_segments.map( (segment, s_index) => {
+                    // Can Reduce the following code to one line
                     segment.is_intersection_ahead = true
 
                     if( s_index == (new_segments.length - 1) ) {
@@ -193,7 +156,7 @@ function union(...paths) {
         return segmented_path
     })
     
-    // Creating new Segments around the intersections
+    // Replacing Segments on the intersection with the new splitted segments
     segmented_paths.forEach( (path_segments, index) => {
         path_segments = path_segments.sort( (a, b) => ( a.segment_no - b.segment_no ) )
         var new_path_segments = []
@@ -204,25 +167,16 @@ function union(...paths) {
             new_path_segments = new_path_segments.concat(paths[index].segments.slice(start, segment.segment_no))
             new_path_segments = new_path_segments.concat(segment.new_segments)
 
-            // total_segments = new_path_segments.length
-            // intersections.push({
-            //     left: total_segments - 2,
-            //     right: total_segments - 1,
-            //     intersectee: segment.intersectee,
-            //     coord: segment.intersection_coord
-            // })
+            // Need to re-consider the following logic
 
             start = parseInt(segment.segment_no) + segment.new_segments.length - 1
         })
     
         new_path_segments = new_path_segments.concat(paths[index].segments.slice(start))
-
-        // new_path_segments.reduce()
     
         paths[index] = {
             path: encodeSVGPath(new_path_segments),
-            segments: new_path_segments,
-            // intersections: intersections
+            segments: new_path_segments
         }
     })
 
@@ -243,7 +197,6 @@ function union(...paths) {
             for( var segment_index = 0; segment_index < new_path_segments.length; segment_index++ )
             {
                 // Delelting the segments from temporarity list to avoid reusing them
-                // delete path_segments[current_path][segment_index - fixed_path_length]
                 path_segments[current_path].shift()
 
                 segment = new_path_segments[segment_index]
@@ -255,6 +208,7 @@ function union(...paths) {
                 else if( segment.is_intersection_ahead === true )
                 {
                     next_path = path_segments[segment.intersectee]
+
                     next_segment_index = next_path.findIndex( next_path_segment => (
                         next_path_segment.intersection_coords?.x == segment.intersection_coords.x &&
                         next_path_segment.intersection_coords?.y == segment.intersection_coords.y &&
@@ -264,11 +218,13 @@ function union(...paths) {
                     if( next_segment_index > -1 )
                     {
                         next_segments = [...next_path.slice(next_segment_index), ...next_path.slice(0, next_segment_index)]
+
                         path_segments[segment.intersectee] = [...next_segments]
-                        // console.log(next_segments.length, next_segment_index, current_path, segment.intersectee, segment_index)
+
                         new_path_segments = [...new_path_segments.slice(0, segment_index + 1), ...next_segments]
-                        // fixed_path_length = segment_index + 1
+
                         visited_paths.push(segment.intersectee)
+
                         current_path = segment.intersectee
                     }
                 }
@@ -281,7 +237,9 @@ function union(...paths) {
                     )
                 )
                 {
+                    // Removing Closepaths and Move To's which get in between the new path
                     new_path_segments.splice(segment_index, 1)
+
                     segment_index--
                 }
             }
@@ -293,122 +251,11 @@ function union(...paths) {
         }
     })
     
-    // function generateNewPathSegments(initial_path, start_path, start_segment = 0) {
-    //     var path = paths[start_path];
-    //     var available_intersections = path.intersections.filter( (intersection, index) => !visited_path_intersections[start_path].includes(index) )
-
-    //     var regional_segments = []
-
-    //     if( available_intersections.length > 0 ) {
-    //         // check if available intersection lenght > 0
-    //         var next_intersection = available_intersections.reduce( (prev, current, index) => {
-    //             if( current.left >= start_segment && prev.left > current.left ) {
-    //                 return current
-    //             }
-
-    //             return prev
-    //         }, available_intersections[0])
-
-    //         if( next_intersection.left < start_segment ) {
-    //             if( initial_path == start_path ) {
-    //                 regional_segments = path.segments.slice(start_segment)
-    //                 return regional_segments;
-    //             }
-    //             else {
-    //                 // Assuming that last element in the path in ClosePath Z
-    //                 regional_segments = path.segments.slice(start_segment, path.segments.length - 1)
-    //                 console.log(path.segments[0])
-    //                 regional_segments.concat(new SVGPathData(`L${path.segments[0].x} ${path.segments[0].y}`).commands)
-    //                 regional_segments.concat(path.segments.slice(1, next_intersection.left + 1))
-    //             }
-    //         }
-    //         else {
-    //             regional_segments = path.segments.slice(start_segment, next_intersection.left + 1)
-    //         }
-
-    //         var {right: next_start_segment} =  paths[next_intersection.intersectee].intersections.find( intersection_a => ((next_intersection.coord.x == intersection_a.coord.x) && (next_intersection.coord.y == intersection_a.coord.y)) )
-
-    //         return regional_segments.concat( generateNewPathSegments(initial_path, next_intersection.intersectee, next_start_segment))
-    //     }
-
-    //     return regional_segments;
-
-    // }
-    // Removing the Segments inside the Union of the Paths
-    // paths = paths.map( (path, index) => {
-    //     if( segmented_paths[index].length == 0 ) {
-    //         return path
-    //     }
-    
-    //     var segments = path.segments.map( (segment, s_index) => {
-    //         if( s_index > 0 ) {
-    //             var P0 = P1 = P2 = [0, 0]
-    //             var midpoint = null
-    //             prev_segment = path.segments[s_index - 1]
-    //             if( prev_segment ) {
-    //                 switch( prev_segment.type ) {
-    //                     case SVGPathData.MOVE_TO:
-    //                     case SVGPathData.LINE_TO:
-    //                     case SVGPathData.QUAD_TO:
-    //                         P0 = [prev_segment.x, prev_segment.y]
-    //                     break;
-    //                 }
-    //             }
-    
-    //             switch(segment.type) {
-    //                 case SVGPathData.LINE_TO:
-    //                     P2 = [segment.x, segment.y]
-    //                     midpoint = [
-    //                         (P0[0] + segment.x) / 2,
-    //                         (P0[1] + segment.y) / 2
-    //                     ]
-    //                 break;
-    //                 case SVGPathData.QUAD_TO:
-    //                     P2 = [segment.x, segment.y]
-    //                     var [{2: midpoint}, right] = splitQCurve([P0, [segment.x1, segment.y1], [segment.x, segment.y]], 0.5)
-    //                 break;
-    //                 case SVGPathData.CLOSE_PATH:
-    //                     P2 = [path.segments[0].x, path.segments[0].y]
-    //                     midpoint = [
-    //                         (P0[0] + P2[0]) / 2,
-    //                         (P0[1] + P2[1]) / 2
-    //                     ]
-    //             }
-    
-    //             if( midpoint ) {
-    //                 other_paths = paths.reduce( (prev, current, p_index) => prev + (( p_index != index ) ? current.path : ""), "" )
-    //                 y_perpendicular_path = `M${midpoint[0]} ${midpoint[1]}L0 ${midpoint[1]}`
-    //                 x_perpendicular_path = `M${midpoint[0]} ${midpoint[1]}L${midpoint[0]} 0`
-    //                 y_intersection_count = intersect(other_paths, y_perpendicular_path, true)
-    //                 x_intersection_count = intersect(other_paths, x_perpendicular_path, true)
-    //                 if( (y_intersection_count % 2 == 1) && (x_intersection_count % 2 == 1) ) {
-    //                     return new SVGPathData(`M${P2[0]} ${P2[1]}`).commands[0]
-    //                     // console.log(new SVGPathData(`M${P2[0]} ${P2[1]}`).commands[0])
-    //                     // return
-    //                 }
-    //             }
-    
-    //             if( (s_index == (path.segments.length - 1)) && (segment.type == SVGPathData.CLOSE_PATH) ) {
-    //                 return new SVGPathData(`L${path.segments[0].x} ${path.segments[0].y}`).commands[0]
-    //             }
-    //         }
-    
-    //         return segment
-    //     })
-    
-    //     // segments = segments.filter( segment => segment )
-    
-    //     return {
-    //         path: encodeSVGPath(segments),
-    //         segments: segments
-    //     }
-    // })
-    
     return new_paths.reduce( (prev, current) => ( prev + current.path ), "" )
 }
 
 
-
+// To Split Qubic Bezeir Curves at the specified t which is {0 -> 1}
 function splitQCurve(points, t, left = [], right = []) {
     if( points.length == 1) {
         left.push(points[0])
@@ -441,6 +288,7 @@ function cartAdd(point1, point2) {
     return [ (point1[0] + point2[0]), (point1[1] + point2[1]) ]
 }
 
+// Splitting the segments at the point of intersection
 function splitSegment(curr_segment, P0, intersection, path, path_no)
 {
     new_segments = []
@@ -471,7 +319,7 @@ function splitSegment(curr_segment, P0, intersection, path, path_no)
     return new_segments
 }
 
-
+// Get Initial points for the givent segement_no in a path
 function getInitialPoint(segment_no, path)
 {
     prev_segment = (segment_no > 0) ? path.segments[segment_no - 1] : null

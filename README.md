@@ -10,3 +10,10 @@ Perform set operations like Union | Intersection | Difference on SVG Paths.
 
 * Intersection
 * Difference
+
+## Supported Path Commands
+
+* M: Move To
+* Z: Close Path
+* L: Line To
+* Q: Qubic Bezier Curve To
