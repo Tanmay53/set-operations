@@ -2,13 +2,26 @@ const intersect = require("path-intersection")
 const {SVGPathData, SVGPathDataTransformer, SVGPathDataEncoder, SVGPathDataParse, encodeSVGPath} = require('svg-pathdata');
 const svg_properties = require('svg-path-properties')
 
-function union(path) {
-    paths = path.split(/(?<=Z)(?=M)/g).map( path => {
-                return {
-                    path: path,
-                    segments: new SVGPathData(path).commands
-                }
-            })
+function union(...paths) {
+    // Handling Multiple paths
+    paths = paths.join("").split(/(?=M)/gi).map( path => {
+        let first_path = ""
+        // Checking if the first Path has M at start or not
+        if( path.search(/M/gi) == 0 ) {
+            // Removing Extra path segments which don't have an M at start
+            first_path = path.split(/(?<=Z)/gi)[0]
+    
+            // Adding Z to paths if not available already
+            if( first_path.search(/Z/gi) == -1  ) {
+                first_path += "Z"
+            }
+        }
+
+        return {
+            path: first_path,
+            segments: new SVGPathData(first_path).commands
+        }
+    })
     
     // Making a Copy of the Array
     segmented_paths = paths.map( path => Array() )

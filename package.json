@@ -1,5 +1,5 @@
 {
-  "name": "set-operations",
+  "name": "set-operations-svg",
   "version": "1.0.0",
   "description": "Perform Set Operations (Union|Intersection|Difference) on SVG Paths",
   "main": "union.js",
