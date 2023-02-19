@@ -2,9 +2,10 @@
   "name": "set-operations-svg",
   "version": "1.0.0",
   "description": "Perform Set Operations (Union|Intersection|Difference) on SVG Paths",
-  "main": "union.js",
+  "main": "src/index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch"
   },
   "repository": {
     "type": "git",
@@ -27,5 +28,8 @@
     "path-intersection": "^2.2.1",
     "svg-path-properties": "^1.1.0",
     "svg-pathdata": "^6.0.3"
+  },
+  "devDependencies": {
+    "jest": "^29.4.1"
   }
 }
